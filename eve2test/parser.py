@@ -2,6 +2,9 @@ import argparse
 
 
 def parse_args():
+    """
+    Parse arguments and return them to main for processing.
+    """
     parser = argparse.ArgumentParser(description="Convert eve.json to test.yaml")
     parser.add_argument("path-to-eve", metavar="<path-to-eve>",
             help="Path to eve.json")
