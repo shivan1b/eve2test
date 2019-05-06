@@ -1,7 +1,10 @@
+import sys
 import json
 
 from eve2test import parser
 from eve2test import context_managers as cxtm
+from eve2test import valmap
+from eve2test.exceptions import UnidentifiedValueError
 
 
 class Event(dict):
@@ -14,6 +17,12 @@ class Event(dict):
         KeyError.
         """
         return 0
+
+
+def perform_sanity_checks(eve_type):
+    if eve_type not in valmap.event_types:
+        raise UnidentifiedValueError(
+                "Uh-oh! Unidentified type of event: {}".format(eve_type))
 
 
 def filter_event_type(event_types):
@@ -42,14 +51,20 @@ def process_eve(path):
         for line in fp:
             eve_rule = json.loads(line)
             content.append(eve_rule)
-            event_types[eve_rule.get("event_type")] += 1
+            eve_type = eve_rule.get("event_type")
+            perform_sanity_checks(eve_type=eve_type)
+            event_types[eve_type] += 1
 
     filter_event_type(event_types=event_types)
 
 
 def main():
     eve_path, output_path = parser.parse_args()
-    process_eve(path=eve_path)
+    try:
+        process_eve(path=eve_path)
+    except UnidentifiedValueError as uve:
+        print(uve)
+        sys.exit(1)
     print("Success")
 
 
