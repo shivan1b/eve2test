@@ -1,28 +1,25 @@
 import sys
 import json
 
+from collections import defaultdict
+import itertools
+
 from eve2test import parser
 from eve2test import context_managers as cxtm
 from eve2test import valmap
 from eve2test.exceptions import UnidentifiedValueError
 
 
-class Event(dict):
-    """
-    Define class for overridden behavior of the usual Python dict.
-    """
-    def __missing__(self, key):
-        """
-        In case a key is missing, its count is set to 0 instead of the usual
-        KeyError.
-        """
-        return 0
-
-
 def perform_sanity_checks(eve_type):
     if eve_type not in valmap.event_types:
         raise UnidentifiedValueError(
                 "Uh-oh! Unidentified type of event: {}".format(eve_type))
+
+
+def filter_event_type_params(eve_rules):
+    for _, category in itertools.groupby(
+            eve_rules, key=lambda item:item['event_type']):
+        print(list(category))
 
 
 def filter_event_type(event_types):
@@ -46,7 +43,7 @@ def process_eve(path):
     Process the provided eve.json file and return the desired results.
     """
     content = list()
-    event_types = Event()
+    event_types = defaultdict(int)
     with open(path, "r") as fp:
         for line in fp:
             eve_rule = json.loads(line)
@@ -56,6 +53,7 @@ def process_eve(path):
             event_types[eve_type] += 1
 
     filter_event_type(event_types=event_types)
+    filter_event_type_params(eve_rules=content)
 
 
 def main():
