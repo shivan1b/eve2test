@@ -1,3 +1,4 @@
+import os
 import sys
 import json
 
@@ -24,8 +25,13 @@ def filter_event_type_params(eve_rules, output_path):
 
 
 def write_to_file(fpath, data):
+    try:
+        os.remove(fpath)
+    except FileNotFoundError:
+        print("{} not found. Creating...".format(fpath))
     with open(fpath, "a") as fp:
         fp.write(data)
+
 
 def filter_event_type(event_types, output_path):
     """

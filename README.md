@@ -3,12 +3,11 @@ Script to convert eve.json into test.yaml file.
 
 ## Usage
 ```
-└─ $ ▶ ./bin/eve2test data/f_event_type_eve.json .
+└─ $ ▶ ./bin/eve2test data/f_event_type_eve.json ./test.yaml
 ```
 
 ## Sample Output
-TODO: Redirect output to file. For now, the output on console would look like
-the following.
+Content of `test.yaml`
 
 ```
 checks:
