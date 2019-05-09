@@ -11,6 +11,7 @@ def parse_args():
     parser.add_argument("output-path", metavar="<output-path>",
             help="Path to the folder where generated test.yaml should be put")
 
+    # add arg to allow stdout only
     args = parser.parse_args()
 
     eve_path = getattr(args, "path-to-eve")
