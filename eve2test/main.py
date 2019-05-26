@@ -2,13 +2,17 @@ import os
 import sys
 import json
 
-from collections import defaultdict
+from collections import defaultdict, Mapping
+import functools
 import itertools
 
 from eve2test import parser
 from eve2test import context_managers as cxtm
 from eve2test import valmap
 from eve2test.exceptions import UnidentifiedValueError
+
+
+skip_fields = ["timestamp"]
 
 
 def perform_sanity_checks(eve_type):
@@ -19,9 +23,24 @@ def perform_sanity_checks(eve_type):
 
 def filter_event_type_params(eve_rules, output_path):
     for _, category in itertools.groupby(
-            eve_rules, key=lambda item:item['event_type']):
-        # print(list(category))
-        pass
+        eve_rules, key=lambda item:item['event_type']):
+        for components in category:
+            with cxtm.YamlIndenter() as yi:
+                yi.write("- filter:", output_path)
+                with yi:
+                    with yi:
+                        yi.write("count: 1", output_path)
+                        yi.write("match:", output_path)
+                        for component, val in components.items():
+                            if component in skip_fields:
+                                continue
+                            if isinstance(val, Mapping):
+                                yi.write("{}:".format(component), output_path)
+                                for opt_k, opt_v in val.items():
+                                    with yi:
+                                        yi.write("{}: {}".format(opt_k, opt_v), output_path)
+                            else:
+                                yi.write("{}: {}".format(component, val), output_path)
 
 
 def write_to_file(fpath, data):
