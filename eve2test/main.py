@@ -104,7 +104,7 @@ def filter_event_type(event_types):
                         yi.write("event_type: {}".format(event_t))
 
 
-def process_eve(eve_path, alerttype_only):
+def process_eve(eve_path, eventtype_only):
     """
     Process the provided eve.json file and write the required checks in the
     provided output file.
@@ -119,7 +119,7 @@ def process_eve(eve_path, alerttype_only):
             perform_sanity_checks(eve_type=eve_type)
             event_types[eve_type] += 1
 
-    if alerttype_only:
+    if eventtype_only:
         filter_event_type(event_types=event_types)
         return
     filter_event_type_params(eve_rules=content)
@@ -130,11 +130,11 @@ def main():
     args = vars(parser.parse_args())
     eve_path = args["path-to-eve"]
     output_path = args["output-path"]
-    alerttype_only = args["alerttype_only"]
+    eventtype_only = args["eventtype_only"]
     init_logger()
     try:
         process_eve(eve_path=eve_path,
-                alerttype_only=alerttype_only)
+                eventtype_only=eventtype_only)
     except UnidentifiedValueError as uve:
         logger.error(uve)
         sys.exit(1)
