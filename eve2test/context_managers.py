@@ -3,6 +3,7 @@ class YamlIndenter:
     Cleanly indent by two spaces every new line with every new context.
     Likewise, unindent if one comes out of context.
     """
+
     def __init__(self, spaces=2, fpath=None):
         self.level = 0
         self.spaces = spaces

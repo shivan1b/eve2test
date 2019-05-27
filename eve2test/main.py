@@ -32,7 +32,7 @@ def perform_sanity_checks(eve_type):
     """
     if eve_type not in valmap.event_types:
         raise UnidentifiedValueError(
-                "Uh-oh! Unidentified type of event: {}".format(eve_type))
+            "Uh-oh! Unidentified type of event: {}".format(eve_type))
 
 
 def filter_event_type_params(eve_rules):
@@ -133,8 +133,7 @@ def main():
     eventtype_only = args["eventtype_only"]
     init_logger()
     try:
-        process_eve(eve_path=eve_path,
-                eventtype_only=eventtype_only)
+        process_eve(eve_path=eve_path, eventtype_only=eventtype_only)
     except UnidentifiedValueError as uve:
         logger.error(uve)
         sys.exit(1)
