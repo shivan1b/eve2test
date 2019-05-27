@@ -10,10 +10,10 @@ def parse_args():
             help="Path to eve.json")
     parser.add_argument("output-path", metavar="<output-path>",
             help="Path to the folder where generated test.yaml should be put")
+    parser.add_argument("--alerttype-only", default=None, action="store_true",
+            help="Create filter blocks based on alert types only")
 
     # add arg to allow stdout only
     args = parser.parse_args()
 
-    eve_path = getattr(args, "path-to-eve")
-    output_path = getattr(args, "output-path")
-    return eve_path, output_path
+    return args

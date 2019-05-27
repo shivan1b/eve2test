@@ -1,76 +1,113 @@
+import json
+import logging
 import os
 import sys
-import json
+from collections import Mapping, defaultdict
 
-from collections import defaultdict, Mapping
-import functools
-import itertools
-
-from eve2test import parser
 from eve2test import context_managers as cxtm
-from eve2test import valmap
+from eve2test import parser, valmap
 from eve2test.exceptions import UnidentifiedValueError
 
 
-skip_fields = ["timestamp"]
+# Get a logger instance
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# Fields to exclude from the filter block
+skip_fields = ["timestamp", "flow_id"]
+
+
+def init_logger():
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 
 def perform_sanity_checks(eve_type):
+    """
+    Check for valid event types.
+    Raise an exception in case of unidentified event types.
+    """
     if eve_type not in valmap.event_types:
         raise UnidentifiedValueError(
                 "Uh-oh! Unidentified type of event: {}".format(eve_type))
 
 
-def filter_event_type_params(eve_rules, output_path):
-    for _, category in itertools.groupby(
-        eve_rules, key=lambda item:item['event_type']):
-        for components in category:
-            with cxtm.YamlIndenter() as yi:
-                yi.write("- filter:", output_path)
+def filter_event_type_params(eve_rules):
+    """
+    Create a filter block based on all the parameters of any event.
+
+    This function uses YamlIndenter which kind of makes the code ugly
+    but yaml.dump does not quite maintain the aesthetics of the dumped
+    data. Developer OCD problems.
+    """
+    write_to_file(data="checks:\n")
+    for components in eve_rules:
+        with cxtm.YamlIndenter(fpath=output_path) as yi:
+            yi.write("- filter:")
+            with yi:
                 with yi:
+                    # Since the match is per component, the count shall
+                    # always be 1.
+                    yi.write("count: 1")
+                    yi.write("match:")
                     with yi:
-                        yi.write("count: 1", output_path)
-                        yi.write("match:", output_path)
                         for component, val in components.items():
+                            # Do not add fields defined by skip_fields variable
+                            # to the filter block
                             if component in skip_fields:
                                 continue
+                            # If the val is a dict itself, write its components
+                            # in the filter block too
                             if isinstance(val, Mapping):
-                                yi.write("{}:".format(component), output_path)
+                                yi.write("{}:".format(component))
                                 for opt_k, opt_v in val.items():
                                     with yi:
-                                        yi.write("{}: {}".format(opt_k, opt_v), output_path)
+                                        yi.write("{}: {}".format(opt_k, opt_v))
                             else:
-                                yi.write("{}: {}".format(component, val), output_path)
+                                yi.write("{}: {}".format(component, val))
 
 
-def write_to_file(fpath, data):
+def write_to_file(data):
+    """
+    Check for the output file if it exists, else create one and writw
+    to it.
+    """
     try:
-        os.remove(fpath)
+        os.remove(output_path)
     except FileNotFoundError:
-        print("{} not found. Creating...".format(fpath))
-    with open(fpath, "a") as fp:
+        logger.info("{} not found. Creating...".format(output_path))
+    with open(output_path, "w+") as fp:
+        fp.write("# *** Add configuration here ***\n\n")
         fp.write(data)
 
 
-def filter_event_type(event_types, output_path):
+def filter_event_type(event_types):
     """
-    Filter based on the event types.
+    Filter based only on the event types.
+
+    This function uses YamlIndenter which kind of makes the code ugly
+    but yaml.dump does not quite maintain the aesthetics of the dumped
+    data. Developer OCD problems.
     """
-    write_to_file(fpath=output_path, data="checks:\n")
-    with cxtm.YamlIndenter() as yi:
+    write_to_file(data="checks:\n")
+    with cxtm.YamlIndenter(fpath=output_path) as yi:
         for event_t, event_c in event_types.items():
-            yi.write("- filter:", output_path)
+            yi.write("- filter:")
             with yi:
                 with yi:
-                    yi.write("count: {}".format(event_c), output_path)
-                    yi.write("match:", output_path)
+                    yi.write("count: {}".format(event_c))
+                    yi.write("match:")
                     with yi:
-                        yi.write("event_type: {}".format(event_t), output_path)
+                        yi.write("event_type: {}".format(event_t))
 
 
-def process_eve(eve_path, output_path):
+def process_eve(eve_path, alerttype_only):
     """
-    Process the provided eve.json file and return the desired results.
+    Process the provided eve.json file and write the required checks in the
+    provided output file.
     """
     content = list()
     event_types = defaultdict(int)
@@ -82,18 +119,25 @@ def process_eve(eve_path, output_path):
             perform_sanity_checks(eve_type=eve_type)
             event_types[eve_type] += 1
 
-    filter_event_type(event_types=event_types, output_path=output_path)
-    filter_event_type_params(eve_rules=content, output_path=output_path)
+    if alerttype_only:
+        filter_event_type(event_types=event_types)
+        return
+    filter_event_type_params(eve_rules=content)
 
 
 def main():
-    eve_path, output_path = parser.parse_args()
+    global output_path
+    args = vars(parser.parse_args())
+    eve_path = args["path-to-eve"]
+    output_path = args["output-path"]
+    alerttype_only = args["alerttype_only"]
+    init_logger()
     try:
-        process_eve(eve_path=eve_path, output_path=output_path)
+        process_eve(eve_path=eve_path,
+                alerttype_only=alerttype_only)
     except UnidentifiedValueError as uve:
-        print(uve)
+        logger.error(uve)
         sys.exit(1)
-    print("Success")
 
 
 if __name__ == "__main__":
