@@ -1,12 +1,12 @@
 import json
+import yaml
 import logging
 import os
 import sys
-from collections import Mapping, defaultdict
+from collections import defaultdict
+from yaml.representer import Representer
 
-from eve2test import context_managers as cxtm
-from eve2test import parser, valmap
-from eve2test.exceptions import UnidentifiedValueError
+from eve2test import parser
 
 
 # Get a logger instance
@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # Fields to exclude from the filter block
-skip_fields = ["timestamp", "flow_id"]
+skip_fields = ["timestamp", "flow_id", "last_reload"]
+
+yaml.add_representer(defaultdict, Representer.represent_dict)
 
 
 def init_logger():
@@ -25,49 +27,36 @@ def init_logger():
     logger.addHandler(handler)
 
 
-def perform_sanity_checks(eve_type):
-    """
-    Check for valid event types.
-    Raise an exception in case of unidentified event types.
-    """
-    if eve_type not in valmap.event_types:
-        raise UnidentifiedValueError(
-            "Uh-oh! Unidentified type of event: {}".format(eve_type))
+def get_manipulated_list(event_type_only=False):
+    with open(eve_path, "r") as fp:
+        content = fp.read()
+    content_list = content.strip().split("\n")
+    manip_list1 = [json.loads(e) for e in content_list]
+    manip_list2 = []
+    for e in manip_list1:
+        md = {k: v for k, v in e.items() if k not in skip_fields}
+        manip_list2.append(md)
+
+    final_list = []
+    for item in manip_list2:
+        mdict = {
+            "filter": {
+                "count": 1,
+                "match": item,
+                },
+                }
+        final_list.append(mdict)
+    mydict = {"checks": final_list}
+    return mydict
 
 
 def filter_event_type_params(eve_rules):
     """
     Create a filter block based on all the parameters of any event.
-
-    This function uses YamlIndenter which kind of makes the code ugly
-    but yaml.dump does not quite maintain the aesthetics of the dumped
-    data. Developer OCD problems.
     """
-    write_to_file(data="checks:\n")
-    for components in eve_rules:
-        with cxtm.YamlIndenter(fpath=output_path) as yi:
-            yi.write("- filter:")
-            with yi:
-                with yi:
-                    # Since the match is per component, the count shall
-                    # always be 1.
-                    yi.write("count: 1")
-                    yi.write("match:")
-                    with yi:
-                        for component, val in components.items():
-                            # Do not add fields defined by skip_fields variable
-                            # to the filter block
-                            if component in skip_fields:
-                                continue
-                            # If the val is a dict itself, write its components
-                            # in the filter block too
-                            if isinstance(val, Mapping):
-                                yi.write("{}:".format(component))
-                                for opt_k, opt_v in val.items():
-                                    with yi:
-                                        yi.write("{}: {}".format(opt_k, opt_v))
-                            else:
-                                yi.write("{}: {}".format(component, val))
+    mlist = get_manipulated_list()
+    ydump = yaml.dump(mlist, default_flow_style=False)
+    write_to_file(data=ydump)
 
 
 def write_to_file(data):
@@ -87,21 +76,21 @@ def write_to_file(data):
 def filter_event_type(event_types):
     """
     Filter based only on the event types.
-
-    This function uses YamlIndenter which kind of makes the code ugly
-    but yaml.dump does not quite maintain the aesthetics of the dumped
-    data. Developer OCD problems.
     """
-    write_to_file(data="checks:\n")
-    with cxtm.YamlIndenter(fpath=output_path) as yi:
-        for event_t, event_c in event_types.items():
-            yi.write("- filter:")
-            with yi:
-                with yi:
-                    yi.write("count: {}".format(event_c))
-                    yi.write("match:")
-                    with yi:
-                        yi.write("event_type: {}".format(event_t))
+    final_list = []
+    for k, v in event_types.items():
+        mdict = {
+            "filter": {
+                "count": v,
+                "match": {
+                    "event_type": k,
+                    },
+                },
+                }
+        final_list.append(mdict)
+    mydict = {"checks": final_list}
+    ydump = yaml.dump(mydict, default_flow_style=False)
+    write_to_file(data=ydump)
 
 
 def process_eve(eve_path, eventtype_only):
@@ -116,7 +105,6 @@ def process_eve(eve_path, eventtype_only):
             eve_rule = json.loads(line)
             content.append(eve_rule)
             eve_type = eve_rule.get("event_type")
-            perform_sanity_checks(eve_type=eve_type)
             event_types[eve_type] += 1
 
     if eventtype_only:
@@ -127,16 +115,13 @@ def process_eve(eve_path, eventtype_only):
 
 def main():
     global output_path
+    global eve_path
     args = vars(parser.parse_args())
     eve_path = args["path-to-eve"]
     output_path = args["output-path"]
     eventtype_only = args["eventtype_only"]
     init_logger()
-    try:
-        process_eve(eve_path=eve_path, eventtype_only=eventtype_only)
-    except UnidentifiedValueError as uve:
-        logger.error(uve)
-        sys.exit(1)
+    process_eve(eve_path=eve_path, eventtype_only=eventtype_only)
 
 
 if __name__ == "__main__":
