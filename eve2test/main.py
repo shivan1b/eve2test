@@ -99,14 +99,18 @@ def process_eve(eve_path, eventtype_only):
     provided output file.
     """
     content = list()
+    allowed_event_types = eventtype_only.split(",")
     event_types = defaultdict(int)
     with open(eve_path, "r") as fp:
         for line in fp:
             eve_rule = json.loads(line)
             content.append(eve_rule)
             eve_type = eve_rule.get("event_type")
-            event_types[eve_type] += 1
+            if eventtype_only and eve_type in allowed_event_types:
+                event_types[eve_type] += 1
 
+    if not event_types:
+        logger.error("No matching events found")
     if eventtype_only:
         filter_event_type(event_types=event_types)
         return
