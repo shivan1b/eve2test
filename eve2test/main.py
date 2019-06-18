@@ -27,27 +27,62 @@ def init_logger():
     logger.addHandler(handler)
 
 
-def get_manipulated_list(event_type_only=False):
+def test_yaml_format(func):
+    def decorated(*args, **kwargs):
+        eve_list = func(kwargs["eve_ds"])
+        all_eve_list = []
+        for item in eve_list:
+            eve_dict = {
+                    "filter": {
+                        "count": item[1],
+                        "match": item[0],
+                        },
+                    }
+            all_eve_list.append(eve_dict)
+        all_eve_dict = {"checks": all_eve_list}
+        all_eve_yaml = yaml.dump(all_eve_dict, default_flow_style=False)
+        return all_eve_yaml
+    return decorated
+
+
+@test_yaml_format
+def get_eve_list_by_type(eve_ds):
+    eve_list = []
+    for k, v in eve_ds.items():
+        eve_list.append((k, v))
+    return eve_list
+
+
+@test_yaml_format
+def get_all_eve_list(eve_ds):
+    eve_list = []
+    for item in eve_ds:
+        eve_list.append((item, 1))
+    return eve_list
+
+
+def get_manipulated_list():
+    """
+    Manipulate eve.json to load successfully in json and skip the fields
+    mentioned in skip_fields variable.
+    """
+    eve_path = args["path-to-eve"]
+    allow_events = args["allow_events"].strip().split(",") if args["allow_events"] else []
     with open(eve_path, "r") as fp:
         content = fp.read()
     content_list = content.strip().split("\n")
-    manip_list1 = [json.loads(e) for e in content_list]
-    manip_list2 = []
-    for e in manip_list1:
+    jcontent_list = [json.loads(e) for e in content_list]
+    all_content_list = []
+    for e in jcontent_list:
         md = {k: v for k, v in e.items() if k not in skip_fields}
-        manip_list2.append(md)
-
-    final_list = []
-    for item in manip_list2:
-        mdict = {
-            "filter": {
-                "count": 1,
-                "match": item,
-                },
-                }
-        final_list.append(mdict)
-    mydict = {"checks": final_list}
-    return mydict
+        all_content_list.append(md)
+    if allow_events:
+        def_eve_content_list = [item for item in all_content_list if item["event_type"] in allow_events]
+        if not def_eve_content_list:
+            logger.error("No matching events found.")
+            return
+        return def_eve_content_list
+    return all_content_list
 
 
 def filter_event_type_params(eve_rules):
@@ -55,8 +90,8 @@ def filter_event_type_params(eve_rules):
     Create a filter block based on all the parameters of any event.
     """
     mlist = get_manipulated_list()
-    ydump = yaml.dump(mlist, default_flow_style=False)
-    write_to_file(data=ydump)
+    all_eve_list = get_all_eve_list(eve_ds=mlist)
+    write_to_file(data=all_eve_list)
 
 
 def write_to_file(data):
@@ -64,6 +99,7 @@ def write_to_file(data):
     Check for the output file if it exists, else create one and writw
     to it.
     """
+    output_path = args["output-path"]
     try:
         os.remove(output_path)
     except FileNotFoundError:
@@ -77,55 +113,38 @@ def filter_event_type(event_types):
     """
     Filter based only on the event types.
     """
-    final_list = []
-    for k, v in event_types.items():
-        mdict = {
-            "filter": {
-                "count": v,
-                "match": {
-                    "event_type": k,
-                    },
-                },
-                }
-        final_list.append(mdict)
-    mydict = {"checks": final_list}
-    ydump = yaml.dump(mydict, default_flow_style=False)
-    write_to_file(data=ydump)
+    all_eve_list = get_eve_list_by_type(eve_ds=event_types)
+    write_to_file(data=all_eve_list)
 
 
-def process_eve(eve_path, eventtype_only):
+def process_eve():
     """
     Process the provided eve.json file and write the required checks in the
     provided output file.
     """
     content = list()
-    allowed_event_types = eventtype_only.split(",")
+    eventtype_only = args["eventtype_only"]
+    eve_path = args["path-to-eve"]
     event_types = defaultdict(int)
     with open(eve_path, "r") as fp:
         for line in fp:
             eve_rule = json.loads(line)
             content.append(eve_rule)
             eve_type = eve_rule.get("event_type")
-            if eventtype_only and eve_type in allowed_event_types:
-                event_types[eve_type] += 1
-
-    if not event_types:
-        logger.error("No matching events found")
+            event_types[eve_type] += 1
     if eventtype_only:
+        if args["allow_events"]:
+            logger.warning("--allow-events option is redundant with --eventtype-only")
         filter_event_type(event_types=event_types)
         return
     filter_event_type_params(eve_rules=content)
 
 
 def main():
-    global output_path
-    global eve_path
+    global args
     args = vars(parser.parse_args())
-    eve_path = args["path-to-eve"]
-    output_path = args["output-path"]
-    eventtype_only = args["eventtype_only"]
     init_logger()
-    process_eve(eve_path=eve_path, eventtype_only=eventtype_only)
+    process_eve()
 
 
 if __name__ == "__main__":
