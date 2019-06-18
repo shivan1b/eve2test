@@ -16,7 +16,7 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  --eventtype-only      Create filter blocks based on event types only
+  --eventtype-only      Create filter blocks based on count of event types only
   --allow-events [ALLOW_EVENTS]
                         Create filter blocks for the specified events
 ```
@@ -76,7 +76,7 @@ checks:
 
 ```
 
-You can also opt to create filters based on event types only. That will generate a rather compact test.yaml as follows. Please note that this creates filters only for the number of different event types.
+You can also opt to create filters based on count of event types only. That will generate a rather compact test.yaml as follows. Please note that this creates filters only for the number of different event types.
 
 On running
 ```
