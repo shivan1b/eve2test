@@ -13,6 +13,8 @@ def parse_args():
                         help="Path to the folder where generated test.yaml should be put")
     parser.add_argument("--eventtype-only", default=None, action="store_true",
                         help="Create filter blocks based on event types only")
+    parser.add_argument("--allow-events", nargs="?", default=None,
+                        help="Create filter blocks for the specified events")
 
     # add arg to allow stdout only
     args = parser.parse_args()
